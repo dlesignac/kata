@@ -15,6 +15,7 @@
         <module>diamond</module>
         <module>code-cracker</module>
         <module>bowling</module>
+        <module>fizzbuzz</module>
     </modules>
 
     <properties>
