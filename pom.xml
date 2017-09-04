@@ -16,6 +16,7 @@
         <module>bowling</module>
         <module>fizzbuzz</module>
         <module>lags</module>
+        <module>gameoflife</module>
     </modules>
 
     <properties>
