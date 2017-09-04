@@ -6,67 +6,51 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class AccountNumber {
 
     private static final int NUMBER_OF_DIGITS = 9;
-    static final String ILLEGIBLE_SUFFIX = " ILL";
-    static final String ERROR_SUFFIX = " ERR";
-    static final String AMB = " AMB ";
 
     private List<Digit> digits;
 
-    private AccountNumber(List<Digit> digits) {
-        if (digits.size() != NUMBER_OF_DIGITS) {
-            throw new IllegalArgumentException("Invalid number of digits");
-        }
+    AccountNumber(Path path) {
+        this.digits = DigitsReader.readDigits(path, NUMBER_OF_DIGITS);
+    }
 
+    private AccountNumber(List<Digit> digits) {
         this.digits = digits;
     }
 
-    public List<Digit> getDigits() {
-        return digits;
+    private boolean allPerfectMatch() {
+        return digits.stream().allMatch(digit -> digit.getPerfectMatch() != null);
     }
 
-    public int checksum() {
+    private boolean isAcceptable() {
+        return allPerfectMatch() && isValid();
+    }
+
+    private boolean isValid() {
+        return checksum() % 11 == 0;
+    }
+
+    private int checksum() {
         int checksum = 0;
 
         for (int i = NUMBER_OF_DIGITS; i > 0; i--) {
-            checksum += i * digits.get(NUMBER_OF_DIGITS - i).getValueAsInt();
+            checksum += i * digits.get(NUMBER_OF_DIGITS - i).getPerfectMatch().toInt();
         }
 
         return checksum;
     }
 
-    public boolean isValid() {
-        return checksum() % 11 == 0;
-    }
-
-    public boolean hasIllegible() {
-        return digits.contains(Digit.UNKNOWN);
-    }
-
-    public String getSuffix() {
-        String suffix = "";
-
-        if (hasIllegible()) {
-            suffix = ILLEGIBLE_SUFFIX;
-        } else if (!isValid()) {
-            suffix = ERROR_SUFFIX;
-        }
-
-        return suffix;
-    }
-
-    public List<AccountNumber> findAlternatives() {
+    private List<AccountNumber> findAlternatives() {
         List<AccountNumber> alternativeAccountNumbers = new ArrayList<>();
 
-        if (!isValid()) {
+        if (!isAcceptable()) {
             for (int i = 0; i < digits.size(); i++) {
-                for (Digit alternativeDigit : digits.get(i).findAlternatives()) {
+                for (DigitValue alternativeDigitValue : digits.get(i).getPotentielMatches()) {
                     List<Digit> alternativeDigits = new ArrayList<>(digits);
-                    alternativeDigits.set(i, alternativeDigit);
+                    alternativeDigits.set(i, new Digit(alternativeDigitValue));
                     AccountNumber an = new AccountNumber(alternativeDigits);
                     alternativeAccountNumbers.add(an);
                 }
@@ -76,73 +60,46 @@ public class AccountNumber {
         return alternativeAccountNumbers;
     }
 
-    public List<AccountNumber> findValidAlternatives() {
+    private List<AccountNumber> findValidAlternatives() {
         return findAlternatives().stream()
-                .filter(AccountNumber::isValid)
+                .filter(AccountNumber::isAcceptable)
                 .collect(Collectors.toList());
-    }
-
-    public static AccountNumber from(Path path) {
-        return new AccountNumber(DigitsReader.readDigits(path, NUMBER_OF_DIGITS));
-    }
-
-    public static AccountNumber from(String digitsAsString) {
-        return new AccountNumber(
-                IntStream.range(0, NUMBER_OF_DIGITS)
-                        .mapToObj(digitsAsString::charAt)
-                        .map(Digit::of)
-                        .collect(Collectors.toList()));
     }
 
     @Override
     public String toString() {
-        if (hasIllegible()) {
-            return toStringWithSuffix();
-        }
+        if (isAcceptable()) return validToString();
 
-        List<AccountNumber> alternatives = findValidAlternatives();
-
-        if (!isValid() && alternatives.size() == 1) {
-            return alternatives.get(0).toStringWithoutSuffix();
-        }
-
-        if (!isValid() && alternatives.size() > 1) {
-            return toStringWithoutSuffix() + AMB + toStringWithAlternatives();
-        }
-
-        return toStringWithSuffix();
+        List<AccountNumber> validAlternatives = findValidAlternatives();
+        if (validAlternatives.size() > 1) return manyAlternativeToString(validAlternatives);
+        if (validAlternatives.size() == 1) return oneAlternativeToString(validAlternatives.get(0));
+        else return noAlternativeToString();
     }
 
-    private String toStringWithoutSuffix() {
+    String partialToString() {
         return digits.stream()
-                .map(Digit::getValue)
+                .map(Digit::toString)
                 .collect(Collectors.joining());
     }
 
-    private String toStringWithSuffix() {
-        return toStringWithoutSuffix() + getSuffix();
+    private String validToString() {
+        return digits.stream().map(Digit::toString).collect(Collectors.joining());
     }
 
-    private String toStringWithAlternatives() {
-        return "[" + StringUtils.join(findValidAlternatives().stream()
-                        .map(accountNumber -> "'" + accountNumber.toStringWithoutSuffix() + "'")
+    private String manyAlternativeToString(List<AccountNumber> alternatives) {
+        return partialToString() + " AMB [" + StringUtils.join(alternatives.stream()
+                        .map(accountNumber -> "'" + accountNumber.toString() + "'")
                         .sorted()
                         .collect(Collectors.toList())
                 , ", ") + "]";
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        AccountNumber that = (AccountNumber) o;
-
-        return digits.equals(that.digits);
+    private String oneAlternativeToString(AccountNumber alternative) {
+        return alternative.toString();
     }
 
-    @Override
-    public int hashCode() {
-        return digits.hashCode();
+    private String noAlternativeToString() {
+        if (!allPerfectMatch()) return partialToString() + " ILL";
+        else return partialToString() + " ERR";
     }
 }

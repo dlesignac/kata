@@ -10,7 +10,7 @@ import java.util.stream.IntStream;
 
 class DigitsReader {
 
-    static List<String> readLines(Path path) {
+    private static List<String> readLines(Path path) {
         try {
             return Files.lines(path).limit(3).collect(Collectors.toList());
         } catch (NoSuchFileException e) {
@@ -20,7 +20,7 @@ class DigitsReader {
         }
     }
 
-    static List<String> readDigitsAsString(List<String> digitsAsLines, int numberOfDigits) {
+    private static List<String> readDigitsAsString(List<String> digitsAsLines, int numberOfDigits) {
         try {
             return IntStream.range(0, numberOfDigits)
                     .mapToObj(i -> {
@@ -40,7 +40,7 @@ class DigitsReader {
         List<String> lines = readLines(path);
         List<String> digitsAsString = readDigitsAsString(lines, numberOfDigits);
         return digitsAsString.stream()
-                .map(Digit::of)
+                .map(Digit::new)
                 .collect(Collectors.toList());
     }
 }
